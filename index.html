@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>コスプレ参加表明メーカー</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #fdf2f8; }
+        canvas { border: 1px solid #ccc; max-width: 90%; height: auto; margin-top: 20px; }
+        .controls { margin: 20px; padding: 20px; background: white; border-radius: 10px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <h1>イベント参加表明メーカー</h1>
+    
+    <div class="controls">
+        <p>1. 写真を選択: <input type="file" id="imageInput" accept="image/*"></p>
+        <p>2. メッセージ: <input type="text" id="textInput" placeholder="だ〜いすきな人と！"></p>
+        <button id="downloadBtn">画像を保存する</button>
+    </div>
+    <br>
+    <canvas id="mainCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const imageInput = document.getElementById('imageInput');
+        const textInput = document.getElementById('textInput');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        const bgImg = new Image();
+        bgImg.src = 'base_frame.png'; // あなたの枠画像ファイル名
+
+        // 枠画像を読み込んだらキャンバスを初期化
+        bgImg.onload = () => {
+            canvas.width = bgImg.width;
+            canvas.height = bgImg.height;
+            draw();
+        };
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. ユーザー画像を先に描く（枠の下にする場合）
+            if (userImg) {
+                // 位置調整などはここで計算（一旦左上に配置）
+                ctx.drawImage(userImg, 100, 150, 400, 600); 
+            }
+
+            // 2. 枠画像を上に重ねる
+            ctx.drawImage(bgImg, 0, 0);
+
+            // 3. テキストを描く
+            ctx.font = "bold 40px 'Arial'";
+            ctx.fillStyle = "#ff69b4";
+            ctx.fillText(textInput.value, 150, 800);
+        }
+
+        let userImg = null;
+        imageInput.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                userImg = new Image();
+                userImg.onload = draw;
+                userImg.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        textInput.oninput = draw;
+
+        downloadBtn.onclick = () => {
+            const link = document.createElement('a');
+            link.download = 'my_schedule.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+    </script>
+</body>
+</html>
