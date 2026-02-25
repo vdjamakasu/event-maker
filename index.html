@@ -3,17 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>コスプレ予定表メーカー</title>
+    <title>コスプレ参加表明メーカー</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #fff5f7; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        canvas { border: 2px solid #ffb6c1; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .controls { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-        button { background: #ff69b4; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #ff1493; }
-        input[type="text"] { padding: 8px; border: 1px solid #ccc; border-radius: 5px; }
-        .hint { font-size: 0.8em; color: #888; margin-top: 5px; }
+        :root {
+            --primary-color: #ff69b4;
+            --bg-color: #fff5f7;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            text-align: center;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+        h1 { color: var(--primary-color); font-size: 1.5rem; }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            align-items: flex-end;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+        
+        label { font-size: 0.85rem; font-weight: bold; color: #666; }
+        
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 200px;
+        }
+        
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        button:hover { background-color: #ff1493; }
+        
+        .btn-download { background-color: #4caf50; width: 100%; max-width: 300px; margin-top: 10px; }
+        .btn-download:hover { background-color: #45a049; }
+
+        #canvas-container {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            overflow: auto; /* スマホではみ出た時用 */
+        }
+        
+        canvas {
+            border: 4px solid white;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .hint {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -22,85 +95,112 @@
     <h1>コスプレ予定表メーカー</h1>
     
     <div class="controls">
-        <div>
-            <label>1. キャラ写真を選択:</label><br>
+        <div class="control-group">
+            <label>1. キャラ写真を選択</label>
             <input type="file" id="imgUpload" accept="image/*">
         </div>
-        <div>
-            <label>2. 文字を追加:</label><br>
-            <input type="text" id="textInput" placeholder="文字を入力...">
-            <button onclick="addText()">追加</button>
+        
+        <div class="control-group">
+            <label>2. メッセージ入力</label>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="textInput" placeholder="文字を入力...">
+                <button onclick="addText()">追加</button>
+            </div>
         </div>
-        <div style="grid-column: 1 / -1;">
-            <button onclick="downloadImage()" style="width: 100%; background: #4caf50;">完成した画像を保存する</button>
-        </div>
+
+        <button class="btn-download" onclick="downloadImage()">完成した画像を保存</button>
     </div>
 
-    <p class="hint">※画像や文字は、クリックして移動・拡大・回転ができます。</p>
-    <canvas id="canvas"></canvas>
+    <p class="hint">【操作】画像や文字をタップして移動・拡大縮小・回転ができます</p>
+
+    <div id="canvas-container">
+        <canvas id="canvas"></canvas>
+    </div>
 </div>
 
 <script>
-    // キャンバスの準備
-    const canvas = new fabric.Canvas('canvas');
-    const FRAME_IMG_URL = 'base_frame.png'; // あなたの枠画像
+    // --- 設定 ---
+    // ここを実際のファイル名（大文字小文字まで正確に）に合わせてください
+    const FRAME_IMG_URL = 'base_frame.png'; 
 
-    // 1. 枠（テンプレート）を背景として読み込む
-    fabric.Image.fromURL(FRAME_IMG_URL, function(img) {
-        canvas.setWidth(img.width);
-        canvas.setHeight(img.height);
-        
-        // 枠を背景画像に設定（ユーザーが動かせないようにする）
-        canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+    // キャンバスの初期化
+    const canvas = new fabric.Canvas('canvas', {
+        preserveObjectStacking: true // 選択しても重なり順が変わらないようにする
     });
 
-    // 2. ユーザー画像のアップロード処理
+    // 1. 枠（背景）を読み込む
+    const imgObj = new Image();
+    imgObj.src = FRAME_IMG_URL;
+    imgObj.onload = function() {
+        // 画像のサイズに合わせてキャンバスをリサイズ
+        canvas.setWidth(imgObj.width);
+        canvas.setHeight(imgObj.height);
+        
+        fabric.Image.fromURL(FRAME_IMG_URL, function(img) {
+            canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas), {
+                originX: 'left',
+                originY: 'top'
+            });
+        });
+    };
+    imgObj.onerror = function() {
+        alert("エラー: 枠画像「" + FRAME_IMG_URL + "」が見つかりません。\nGitHubにアップロードしたファイル名と、コード内のファイル名が一致しているか確認してください。");
+    };
+
+    // 2. ユーザー画像の追加
     document.getElementById('imgUpload').onchange = function(e) {
         const file = e.target.files[0];
+        if (!file) return;
+
         const reader = new FileReader();
         reader.onload = function(f) {
             const data = f.target.result;
             fabric.Image.fromURL(data, function(img) {
-                // 画像が大きすぎる場合、調整して配置
-                img.scaleToWidth(300);
+                // 初期サイズ調整（キャンバスの半分くらいの幅にする）
+                img.scaleToWidth(canvas.width / 2);
                 canvas.add(img);
                 canvas.setActiveObject(img);
-                // 画像を枠の「後ろ」に回したい場合は、枠を前景にする設定も可能ですが
-                // まずは自由に動かせるようにそのまま追加します
+                canvas.renderAll();
             });
         };
         reader.readAsDataURL(file);
     };
 
-    // 3. テキスト追加処理
+    // 3. テキスト追加
     function addText() {
         const val = document.getElementById('textInput').value;
         if (!val) return;
         
         const text = new fabric.IText(val, {
-            left: 100,
-            top: 100,
+            left: canvas.width / 4,
+            top: canvas.height / 2,
             fontFamily: 'sans-serif',
             fill: '#ff69b4',
+            stroke: '#ffffff',
+            strokeWidth: 2,
             fontWeight: 'bold',
             fontSize: 40
         });
         canvas.add(text);
+        canvas.setActiveObject(text);
         document.getElementById('textInput').value = '';
     </div>
 
-    // 4. 画像ダウンロード処理
+    // 4. 画像保存
     function downloadImage() {
-        // 保存時は選択枠（青い線）を消すために選択解除
+        // 選択枠を消すために選択解除
         canvas.discardActiveObject();
         canvas.renderAll();
         
+        // 高画質で書き出し
         const dataURL = canvas.toDataURL({
             format: 'png',
-            quality: 1
+            quality: 1.0,
+            multiplier: 1 // 解像度を維持
         });
+        
         const link = document.createElement('a');
-        link.download = 'cosplay_plan.png';
+        link.download = 'cosplay_schedule_' + Date.now() + '.png';
         link.href = dataURL;
         link.click();
     }
